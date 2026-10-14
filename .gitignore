@@ -151,11 +151,16 @@ activemq-data/
 .env
 .envrc
 .venv
+.venv-procon/
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Django local data
+karatsu_drift/media/
+karatsu_drift/staticfiles/
 
 # Spyder project settings
 .spyderproject

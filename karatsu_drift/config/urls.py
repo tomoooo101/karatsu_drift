@@ -1,21 +1,32 @@
-"""config URL Configuration
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/4.0/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path
 
+from app import views
+
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path("admin/", admin.site.urls),
+    path("", views.home, name="home"),
+    path("api/session/", views.session_status, name="session"),
+    path("api/register/", views.register, name="register"),
+    path("api/login/", views.login_view, name="login"),
+    path("api/logout/", views.logout_view, name="logout"),
+    path("api/bootstrap/", views.bootstrap, name="bootstrap"),
+    path("api/profile/", views.profile, name="profile"),
+    path("api/account/delete/", views.account_delete, name="account-delete"),
+    path("api/vehicles/", views.vehicle_create, name="vehicle-create"),
+    path("api/vehicles/<uuid:vehicle_id>/delete/", views.vehicle_delete, name="vehicle-delete"),
+    path("api/vehicles/<uuid:vehicle_id>/share/", views.vehicle_share, name="vehicle-share"),
+    path("api/costs/", views.cost_create, name="cost-create"),
+    path("api/costs/<uuid:record_id>/update/", views.cost_update, name="cost-update"),
+    path("api/costs/<uuid:record_id>/delete/", views.cost_delete, name="cost-delete"),
+    path("api/cars/search/", views.car_search, name="car-search"),
+    path("api/posts/", views.post_create, name="post-create"),
+    path("api/posts/<uuid:post_id>/delete/", views.post_delete, name="post-delete"),
+    path("api/posts/<uuid:post_id>/like/", views.like_toggle, name="like-toggle"),
+    path("api/posts/<uuid:post_id>/unlike/", views.unlike, name="unlike"),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -1,0 +1,7 @@
+# Python 3.9 can run the local demo with Django 4.2. For hosted deployment,
+# use Python 3.10+ and the supported Django 5.2 LTS line.
+Django>=4.2.27,<4.3; python_version < "3.10"
+Django>=5.2.17,<5.3; python_version >= "3.10"
+Pillow>=11,<13
+psycopg[binary]>=3.2,<4
+whitenoise>=6.9,<7
