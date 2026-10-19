@@ -49,6 +49,14 @@ Python 3.9のローカル環境ではDjango 4.2系を使います。インター
 
 公開サーバー用の静的ファイルは `python manage.py collectstatic --noinput` で生成します。`DJANGO_DEBUG=0` にし、`DJANGO_SECRET_KEY`、`DJANGO_ALLOWED_HOSTS`、`DJANGO_CSRF_TRUSTED_ORIGINS` を環境変数で設定してください。HTTPSと本番用WSGIサーバーも必要です。
 
+## Renderで提出デモを公開する
+
+リポジトリ直下の `render.yaml` は、RenderのBlueprintからWebサービスとPostgreSQLを作る設定です。GitHubへ変更をpushした後、RenderでNew Blueprint Instanceを選び、`karatsu_drift` リポジトリを接続してApplyすると公開できます。Renderは`RENDER_EXTERNAL_HOSTNAME`をアプリへ渡し、Djangoの許可ホストとCSRFオリジンに反映します。
+
+このBlueprintは提出用の無料デモ設定です。Renderの無料Webサービスは15分アクセスがないと休止し、無料Postgresは作成から30日で期限切れになります。無料Webサービスではアップロード画像も再起動・再デプロイ時に消えます。長期運用や投稿画像の保存には有料のWebサービス／Postgresと永続ディスク、または外部画像ストレージが必要です。Renderの利用条件と料金をDashboardで確認してからApplyしてください。
+
+無料Postgresは新規作成されるため、ローカルDBの内容は自動で移りません。公開後に利用者が新規登録すれば共有できます。既存データも移す場合は、RenderのPostgres接続情報を使ってローカルから一度だけ`loaddata`します。`sqlite-backup.json`は利用者データを含むためGitへ登録しないでください（`.gitignore`で除外済み）。
+
 ## 設計資料との対応
 
 画面設計書のSCR-01〜SCR-07をWeb画面に実装し、ガントチャートの認証、車両、維持費、車種検索、投稿、いいねをサーバー機能として接続しています。JavaのServlet／DAO／Bean相当の役割は、DjangoのView／ORMモデル／サービス処理で構成します。

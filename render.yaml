@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: karatsu-drift
+    runtime: python
+    region: singapore
+    plan: free
+    buildCommand: python -m pip install -r requirements.txt && python karatsu_drift/manage.py collectstatic --noinput
+    startCommand: cd karatsu_drift && python manage.py migrate --noinput && python -m gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: DJANGO_DEBUG
+        value: "0"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DB_ENGINE
+        value: postgresql
+      - key: DB_NAME
+        fromDatabase:
+          name: karatsu-drift-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: karatsu-drift-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: karatsu-drift-db
+          property: password
+      - key: DB_HOST
+        fromDatabase:
+          name: karatsu-drift-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: karatsu-drift-db
+          property: port
+
+databases:
+  - name: karatsu-drift-db
+    databaseName: karatsu_drift
+    user: karatsu_app
+    region: singapore
+    plan: free

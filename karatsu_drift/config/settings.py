@@ -7,8 +7,14 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-only-change-me-before-depl
 if not DEBUG and SECRET_KEY == "dev-only-change-me-before-deploy":
     raise RuntimeError("本番環境では DJANGO_SECRET_KEY を設定してください。")
 
+render_hostname = os.environ.get("RENDER_EXTERNAL_HOSTNAME", "").strip()
 ALLOWED_HOSTS = [host.strip() for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if host.strip()]
+if render_hostname and render_hostname not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(render_hostname)
 CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if origin.strip()]
+render_origin = f"https://{render_hostname}" if render_hostname else ""
+if render_origin and render_origin not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(render_origin)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
