@@ -195,6 +195,23 @@ def bootstrap(request):
     )
 
 
+@require_GET
+@api_login_required
+def post_feed(request):
+    posts = list(
+        Post.objects.filter(is_public=True)
+        .select_related("author")
+        .annotate(like_count=Count("likes"))[:200]
+    )
+    liked_ids = {
+        str(value)
+        for value in Like.objects.filter(user=request.user, post__in=posts).values_list("post_id", flat=True)
+    }
+    response = JsonResponse({"posts": [post_data(post, liked_ids) for post in posts]})
+    response["Cache-Control"] = "no-store"
+    return response
+
+
 @require_POST
 @api_login_required
 def profile(request):

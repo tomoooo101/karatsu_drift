@@ -22,6 +22,7 @@ urlpatterns = [
     path("api/costs/<uuid:record_id>/update/", views.cost_update, name="cost-update"),
     path("api/costs/<uuid:record_id>/delete/", views.cost_delete, name="cost-delete"),
     path("api/cars/search/", views.car_search, name="car-search"),
+    path("api/posts/feed/", views.post_feed, name="post-feed"),
     path("api/posts/", views.post_create, name="post-create"),
     path("api/posts/<uuid:post_id>/delete/", views.post_delete, name="post-delete"),
     path("api/posts/<uuid:post_id>/like/", views.like_toggle, name="like-toggle"),

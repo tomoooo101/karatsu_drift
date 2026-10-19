@@ -7,15 +7,11 @@
 リポジトリのルート（このREADMEがあるフォルダー）でPowerShellを開きます。
 
 ```powershell
-py -3.9 -m venv .venv-procon
-.\.venv-procon\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-cd karatsu_drift
-python manage.py migrate
-python manage.py runserver
+.\.venv-procon\Scripts\python.exe .\karatsu_drift\manage.py migrate
+.\.venv-procon\Scripts\python.exe .\karatsu_drift\manage.py runserver 0.0.0.0:8000
 ```
 
-ブラウザーで `http://127.0.0.1:8000/` を開きます。ログイン画面から利用者を登録してください。共有機能の確認には、別のブラウザー（またはプライベートウィンドウ）で2つ目のアカウントを作ると分かりやすいです。
+`.env` の接続設定は自動で読み込まれます。ブラウザーでは自分のPCから `http://127.0.0.1:8000/`、同じネットワークのメンバーからは `.env` の許可ホストに設定したPCのIPアドレス（例：`http://10.251.197.180:8000/`）を開きます。初回セットアップで依存パッケージを入れる場合は `python -m pip install -r requirements.txt` を実行してください。ログイン画面から利用者を登録します。
 
 管理画面用アカウントを作る場合は、別のターミナルで同じ仮想環境を有効にしてから `python manage.py createsuperuser` を実行します。
 
@@ -32,16 +28,7 @@ python manage.py runserver
 
 ## DBと保存場所
 
-初期設定ではSQLiteの `karatsu_drift/db.sqlite3` に保存します。PostgreSQLを使う場合は、起動前に環境変数を設定します。
-
-```powershell
-$env:DB_ENGINE = "postgresql"
-$env:DB_NAME = "karatsu_drift"
-$env:DB_USER = "postgres"
-$env:DB_PASSWORD = "<DBパスワード>"
-$env:DB_HOST = "127.0.0.1"
-$env:DB_PORT = "5432"
-```
+ローカル開発ではPostgreSQLを使用します。リポジトリ直下の `.env` をDjangoが起動時に自動で読み込むため、PowerShellでDB設定を毎回入力する必要はありません。`.env` はGit管理対象外です。別のPCで開発するときは `.env.example` を `.env` にコピーし、そのPCの接続情報を設定してください。
 
 投稿画像は `karatsu_drift/media/posts/` に保存します。画像はJPEG、PNG、WebP、5MB以下に制限しています。DBと画像フォルダーはバックアップ対象です。
 
@@ -55,7 +42,7 @@ Python 3.9のローカル環境ではDjango 4.2系を使います。インター
 
 このBlueprintは提出用の無料デモ設定です。Renderの無料Webサービスは15分アクセスがないと休止し、無料Postgresは作成から30日で期限切れになります。無料Webサービスではアップロード画像も再起動・再デプロイ時に消えます。長期運用や投稿画像の保存には有料のWebサービス／Postgresと永続ディスク、または外部画像ストレージが必要です。Renderの利用条件と料金をDashboardで確認してからApplyしてください。
 
-無料Postgresは新規作成されるため、ローカルDBの内容は自動で移りません。公開後に利用者が新規登録すれば共有できます。既存データも移す場合は、RenderのPostgres接続情報を使ってローカルから一度だけ`loaddata`します。`sqlite-backup.json`は利用者データを含むためGitへ登録しないでください（`.gitignore`で除外済み）。
+無料Postgresは新規作成されるため、ローカルDBの内容は自動で移りません。公開後に利用者が新規登録すれば共有できます。既存データも移す場合は、RenderのPostgres接続情報を使ってローカルから一度だけ`loaddata`します。
 
 ## 設計資料との対応
 

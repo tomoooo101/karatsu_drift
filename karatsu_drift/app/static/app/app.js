@@ -14,6 +14,9 @@
   };
   const month = () => today().slice(0, 7);
   const state = { user: null, vehicles: [], costs: [], posts: [], categories: [], carSearchResults: [] };
+  const validViews = new Set(['home', 'costs', 'cars', 'community', 'profile']);
+  let currentView = 'home';
+  let postPollBusy = false;
   let confirmAction = null;
 
   function toast(message) {
@@ -35,6 +38,7 @@
     const response = await fetch(path, {
       method,
       headers,
+      cache: method === 'GET' ? 'no-store' : 'default',
       credentials: 'same-origin',
       body: body ? (formData ? body : JSON.stringify(body)) : undefined,
     });
@@ -62,11 +66,22 @@
     $('#signedInName').textContent = state.user.name;
   }
 
-  function switchView(name) {
+  function switchView(name, { updateHistory = true } = {}) {
+    if (!validViews.has(name)) return;
+    currentView = name;
+    if (updateHistory && window.location.hash !== `#${name}`) {
+      window.history.pushState({ view: name }, '', `#${name}`);
+    }
     $$('.view').forEach((view) => view.classList.toggle('active', view.id === `view-${name}`));
     $$('.nav-item').forEach((button) => button.classList.toggle('active', button.dataset.view === name));
     window.scrollTo({ top: 0, behavior: 'smooth' });
     render();
+    if (name === 'community') refreshPosts();
+  }
+
+  function restoreViewFromLocation() {
+    const requestedView = window.location.hash.slice(1);
+    switchView(validViews.has(requestedView) ? requestedView : 'home', { updateHistory: false });
   }
 
   function setOptions(select, rows, allLabel = '') {
@@ -148,9 +163,7 @@
     $('#costList').className = filtered.length ? '' : 'empty-state';
     $('#costList').innerHTML = filtered.length ? filtered.map(costHtml).join('') : '記録がありません。';
 
-    const term = $('#postSearch').value.trim().toLocaleLowerCase('ja-JP');
-    const posts = state.posts.filter((post) => `${post.model} ${post.text} ${post.author}`.toLocaleLowerCase('ja-JP').includes(term));
-    $('#postList').innerHTML = posts.length ? posts.map((post) => `<article class="post-card"><div class="post-meta"><span>${esc(post.author)}　｜　${esc(post.model)}</span><span>${esc(post.createdAt.slice(0, 10))}</span></div><p class="post-body">${esc(post.text)}</p>${post.photoUrl ? `<img class="post-image" src="${esc(post.photoUrl)}" alt="${esc(post.model)}の投稿写真" loading="lazy">` : ''}${post.photo ? `<p class="row-sub">写真メモ：${esc(post.photo)}</p>` : ''}<div class="inline-actions"><button class="like-button ${post.liked ? 'liked' : ''}" data-like="${esc(post.id)}">${post.liked ? '♥' : '♡'} いいね　${post.likes}</button>${post.authorId === state.user.id ? `<button class="text-button" data-delete-post="${esc(post.id)}">投稿を削除</button>` : ''}</div></article>`).join('') : '<div class="panel empty-state">投稿がありません。最初の投稿をしてみましょう。</div>';
+    renderPosts();
 
     $('#vehicleList').className = state.vehicles.length ? '' : 'empty-state';
     $('#vehicleList').innerHTML = state.vehicles.length ? state.vehicles.map((vehicle) => `<div class="vehicle-row"><div><span class="row-title">${esc(vehicleName(vehicle.id))}</span><span class="row-sub">${vehicle.year ? `　${esc(vehicle.year)}年式` : ''}　${vehicle.shareForStats ? '匿名統計に共有中' : '統計共有なし'}</span></div><div class="inline-actions"><button class="text-button" data-toggle-share="${esc(vehicle.id)}">${vehicle.shareForStats ? '統計共有を解除' : '統計共有に同意'}</button><button class="text-button" data-remove-car="${esc(vehicle.id)}">削除</button></div></div>`).join('') : '車両が登録されていません。';
@@ -161,6 +174,27 @@
 
   async function refresh() {
     await loadData();
+  }
+
+  async function refreshPosts() {
+    if (!state.user || currentView !== 'community' || document.hidden || postPollBusy) return;
+    postPollBusy = true;
+    try {
+      const data = await api('/api/posts/feed/');
+      state.posts = data.posts;
+      if (currentView === 'community') renderPosts();
+    } catch (error) {
+      // Keep the current feed during temporary connection errors; retry on the next poll.
+    } finally {
+      postPollBusy = false;
+    }
+  }
+
+  function renderPosts() {
+    if (!state.user) return;
+    const term = $('#postSearch').value.trim().toLocaleLowerCase('ja-JP');
+    const posts = state.posts.filter((post) => `${post.model} ${post.text} ${post.author}`.toLocaleLowerCase('ja-JP').includes(term));
+    $('#postList').innerHTML = posts.length ? posts.map((post) => `<article class="post-card"><div class="post-meta"><span>${esc(post.author)}　｜　${esc(post.model)}</span><span>${esc(post.createdAt.slice(0, 10))}</span></div><p class="post-body">${esc(post.text)}</p>${post.photoUrl ? `<img class="post-image" src="${esc(post.photoUrl)}" alt="${esc(post.model)}の投稿写真" loading="lazy">` : ''}${post.photo ? `<p class="row-sub">写真メモ：${esc(post.photo)}</p>` : ''}<div class="inline-actions"><button class="like-button ${post.liked ? 'liked' : ''}" data-like="${esc(post.id)}">${post.liked ? '♥' : '♡'} いいね　${post.likes}</button>${post.authorId === state.user.id ? `<button class="text-button" data-delete-post="${esc(post.id)}">投稿を削除</button>` : ''}</div></article>`).join('') : '<div class="panel empty-state">投稿がありません。最初の投稿をしてみましょう。</div>';
   }
 
   function openCost(record = null) {
@@ -208,8 +242,10 @@
   async function initialLoad() {
     try {
       const status = await api('/api/session/');
-      if (status.authenticated) await loadData();
-      else showAuth();
+      if (status.authenticated) {
+        await loadData();
+        restoreViewFromLocation();
+      } else showAuth();
     } catch (error) {
       showAuth();
       $('#loginError').textContent = error.message;
@@ -225,6 +261,7 @@
       await api('/api/login/', { method: 'POST', body: Object.fromEntries(new FormData(form)) });
       form.reset();
       await refresh();
+      restoreViewFromLocation();
     } catch (error) { $('#loginError').textContent = error.message; }
   });
   $('#registerForm').addEventListener('submit', async (event) => {
@@ -234,6 +271,7 @@
       await api('/api/register/', { method: 'POST', body: Object.fromEntries(new FormData(form)) });
       form.reset();
       await refresh();
+      restoreViewFromLocation();
       toast('アカウントを作成しました。');
     } catch (error) { $('#registerError').textContent = error.message; }
   });
@@ -242,6 +280,10 @@
     catch (error) { toast(error.message); }
   });
 
+  window.addEventListener('hashchange', restoreViewFromLocation);
+  window.addEventListener('popstate', restoreViewFromLocation);
+  window.setInterval(refreshPosts, 15000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshPosts(); });
   $$('.nav-item').forEach((button) => button.addEventListener('click', () => switchView(button.dataset.view)));
   $$('[data-view-link]').forEach((button) => button.addEventListener('click', () => switchView(button.dataset.viewLink)));
   $('#profileButton').addEventListener('click', () => switchView('profile'));
