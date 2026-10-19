@@ -49,6 +49,7 @@ def current_user(user):
         "id": str(user.pk),
         "email": user.email,
         "name": user.display_name,
+        "photoUrl": default_storage.url(user.photo_path) if user.photo_path else "",
     }
 
 
@@ -60,6 +61,7 @@ def vehicle_data(vehicle):
         "model": model.model_name,
         "year": model.model_year or "",
         "nickname": vehicle.nickname,
+        "photoUrl": default_storage.url(vehicle.photo_path) if vehicle.photo_path else "",
         "shareForStats": vehicle.share_for_stats,
         "active": vehicle.is_active,
     }
@@ -82,6 +84,7 @@ def post_data(post, liked_ids):
         "id": str(post.pk),
         "author": post.author.display_name,
         "authorId": str(post.author_id),
+        "authorPhotoUrl": default_storage.url(post.author.photo_path) if post.author.photo_path else "",
         "model": post.model_name,
         "text": post.text,
         "photo": post.photo_note,
@@ -238,12 +241,39 @@ def profile(request):
 
 @require_POST
 @api_login_required
+def profile_photo(request):
+    user = request.user
+    upload = request.FILES.get("photoFile")
+    if not upload and request.POST.get("reset") == "true":
+        delete_user_avatar_file(user)
+        user.photo_path = ""
+        user.save(update_fields=["photo_path", "updated_at"])
+        return JsonResponse({"photoUrl": ""})
+    if not upload:
+        return api_error("プロフィール写真を選択してください。")
+    error = validate_image(upload)
+    if error:
+        return api_error(error)
+    suffix = Path(upload.name).suffix.lower()
+    relative_path = default_storage.save(f"profiles/{user.pk}/{uuid4().hex}{suffix}", upload)
+    old_path = user.photo_path
+    user.photo_path = relative_path
+    user.save(update_fields=["photo_path", "updated_at"])
+    if old_path:
+        default_storage.delete(old_path)
+    return JsonResponse({"photoUrl": default_storage.url(relative_path)})
+
+
+@require_POST
+@api_login_required
 def account_delete(request):
     data = request_data(request)
     if not isinstance(data, dict) or not request.user.check_password(str(data.get("password", ""))):
         return api_error("パスワードを確認してください。", 403)
     user = request.user
     delete_user_photo_files(user)
+    delete_user_avatar_file(user)
+    delete_vehicle_photo_files(user)
     logout(request)
     user.delete()
     return JsonResponse({"deleted": True})
@@ -286,8 +316,38 @@ def vehicle_delete(request, vehicle_id):
         return api_error("車両が見つかりません。", 404)
     if vehicle.cost_records.exists():
         return api_error("維持費記録がある車両は削除できません。先に記録を削除してください。", 409)
+    delete_vehicle_photo_file(vehicle)
     vehicle.delete()
     return JsonResponse({"deleted": True})
+
+
+@require_POST
+@api_login_required
+def vehicle_photo(request, vehicle_id):
+    vehicle = Vehicle.objects.filter(owner=request.user, pk=vehicle_id).first()
+    if not vehicle:
+        return api_error("車両が見つかりません。", 404)
+    upload = request.FILES.get("photoFile")
+    if not upload and request.POST.get("reset") == "true":
+        delete_vehicle_photo_file(vehicle)
+        vehicle.photo_path = ""
+        vehicle.save(update_fields=["photo_path", "updated_at"])
+        return JsonResponse({"photoUrl": ""})
+    if not upload:
+        return api_error("画像ファイルを選択してください。")
+    error = validate_image(upload)
+    if error:
+        return api_error(error)
+    suffix = Path(upload.name).suffix.lower()
+    relative_path = default_storage.save(
+        f"vehicles/{vehicle.owner_id}/{vehicle.vehicle_id}/{uuid4().hex}{suffix}", upload
+    )
+    old_path = vehicle.photo_path
+    vehicle.photo_path = relative_path
+    vehicle.save(update_fields=["photo_path", "updated_at"])
+    if old_path:
+        default_storage.delete(old_path)
+    return JsonResponse({"photoUrl": default_storage.url(relative_path)})
 
 
 @require_POST
@@ -475,6 +535,21 @@ def delete_post_photo_file(post):
 def delete_user_photo_files(user):
     for post in Post.objects.filter(author=user).only("photo_url"):
         delete_post_photo_file(post)
+
+
+def delete_user_avatar_file(user):
+    if user.photo_path:
+        default_storage.delete(user.photo_path)
+
+
+def delete_vehicle_photo_file(vehicle):
+    if vehicle.photo_path:
+        default_storage.delete(vehicle.photo_path)
+
+
+def delete_vehicle_photo_files(user):
+    for vehicle in Vehicle.objects.filter(owner=user).only("photo_path"):
+        delete_vehicle_photo_file(vehicle)
 
 
 @require_POST

@@ -7,6 +7,9 @@
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   })[character]);
+  const avatarContent = (photoUrl, name) => photoUrl
+    ? `<img src="${esc(photoUrl)}" alt="" loading="lazy">`
+    : esc([...String(name || 'U')][0] || 'U');
   const today = () => {
     const now = new Date();
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
@@ -52,6 +55,7 @@
   }
 
   function showAuth() {
+    $('#startupScreen').hidden = true;
     $('#authScreen').hidden = false;
     $('#appHeader').hidden = true;
     $('#appMain').hidden = true;
@@ -59,11 +63,13 @@
   }
 
   function showApp() {
+    $('#startupScreen').hidden = true;
     $('#authScreen').hidden = true;
     $('#appHeader').hidden = false;
     $('#appMain').hidden = false;
     $('#appFooter').hidden = false;
-    $('#signedInName').textContent = state.user.name;
+    $('#userAvatar').innerHTML = avatarContent(state.user.photoUrl, state.user.name);
+    $('#profileButton').setAttribute('aria-label', `マイページ（${state.user.name}）`);
   }
 
   function switchView(name, { updateHistory = true } = {}) {
@@ -132,6 +138,34 @@
     const vehicleOptions = state.vehicles.map((vehicle) => ({ value: vehicle.id, label: vehicleName(vehicle.id) }));
     setOptions($('#homeCar'), vehicleOptions, 'すべての車');
     setOptions($('#costCar'), vehicleOptions, 'すべての車');
+    const selectedVehicleId = $('#homeCar').value;
+    const selectedVehicle = state.vehicles.find((vehicle) => vehicle.id === selectedVehicleId);
+    const photoVehicle = selectedVehicle || (state.vehicles.length === 1 ? state.vehicles[0] : null);
+    const defaultCarImage = '/static/app/default-car.png';
+    $('#garageVehicleImage').src = photoVehicle?.photoUrl || defaultCarImage;
+    $('#garageVehicleImage').alt = photoVehicle ? `${photoVehicle.make} ${photoVehicle.model}の画像` : '黄色い車のイラスト';
+    $('#vehiclePhotoInput').dataset.vehicleId = photoVehicle?.id || '';
+    $('#changeVehiclePhoto').disabled = !photoVehicle;
+    $('#changeVehiclePhoto').title = photoVehicle ? '車の画像を変更' : '画像を変更する車両を選択してください';
+    $('#resetVehiclePhoto').hidden = !photoVehicle?.photoUrl;
+    const garageCosts = selectedVehicleId && selectedVehicleId !== 'all'
+      ? state.costs.filter((record) => record.carId === selectedVehicleId)
+      : state.costs;
+    $('#garageVehicleTitle').textContent = selectedVehicle
+      ? `${selectedVehicle.make} ${selectedVehicle.model}`
+      : state.vehicles.length ? 'ガレージの全車両' : '車両がありません';
+    $('#garageVehicleSub').textContent = selectedVehicle
+      ? (selectedVehicle.nickname || 'MY GARAGE')
+      : state.vehicles.length ? `${state.vehicles.length}台の車両を管理中` : '車両を登録してガレージをつくりましょう';
+    $('#garageVehicleStatus').textContent = selectedVehicle
+      ? (selectedVehicle.shareForStats ? '統計共有中' : '登録済み')
+      : state.vehicles.length ? '複数台を管理中' : '未登録';
+    $('#garageVehicleYear').textContent = selectedVehicle?.year ? `${selectedVehicle.year}年` : selectedVehicle ? '未登録' : '—';
+    $('#garageVehicleExpense').textContent = yen(garageCosts.reduce((sum, record) => sum + record.amount, 0));
+    $('#garageVehicleRecords').textContent = `${garageCosts.length}件`;
+    const garageDate = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+      .format(new Date()).toUpperCase();
+    $('#garageDate').textContent = `MY GARAGE / ${garageDate}`;
     setOptions($('#summaryCategory'), state.categories.map((item) => ({ value: item.code, label: item.label })), 'すべての費目');
     setOptions($('#costCategory'), state.categories.map((item) => ({ value: item.code, label: item.label })), 'すべての費目');
     setOptions($('#costForm').elements.category, state.categories.map((item) => ({ value: item.code, label: item.label })));
@@ -169,7 +203,9 @@
     $('#vehicleList').innerHTML = state.vehicles.length ? state.vehicles.map((vehicle) => `<div class="vehicle-row"><div><span class="row-title">${esc(vehicleName(vehicle.id))}</span><span class="row-sub">${vehicle.year ? `　${esc(vehicle.year)}年式` : ''}　${vehicle.shareForStats ? '匿名統計に共有中' : '統計共有なし'}</span></div><div class="inline-actions"><button class="text-button" data-toggle-share="${esc(vehicle.id)}">${vehicle.shareForStats ? '統計共有を解除' : '統計共有に同意'}</button><button class="text-button" data-remove-car="${esc(vehicle.id)}">削除</button></div></div>`).join('') : '車両が登録されていません。';
     $('#profileForm').elements.name.value = state.user.name;
     $('#profileForm').elements.email.value = state.user.email;
-    $('#signedInName').textContent = state.user.name;
+    $('#userAvatar').innerHTML = avatarContent(state.user.photoUrl, state.user.name);
+    $('#profilePhotoPreview').innerHTML = avatarContent(state.user.photoUrl, state.user.name);
+    $('#resetProfilePhoto').hidden = !state.user.photoUrl;
   }
 
   async function refresh() {
@@ -194,7 +230,7 @@
     if (!state.user) return;
     const term = $('#postSearch').value.trim().toLocaleLowerCase('ja-JP');
     const posts = state.posts.filter((post) => `${post.model} ${post.text} ${post.author}`.toLocaleLowerCase('ja-JP').includes(term));
-    $('#postList').innerHTML = posts.length ? posts.map((post) => `<article class="post-card"><div class="post-meta"><span>${esc(post.author)}　｜　${esc(post.model)}</span><span>${esc(post.createdAt.slice(0, 10))}</span></div><p class="post-body">${esc(post.text)}</p>${post.photoUrl ? `<img class="post-image" src="${esc(post.photoUrl)}" alt="${esc(post.model)}の投稿写真" loading="lazy">` : ''}${post.photo ? `<p class="row-sub">写真メモ：${esc(post.photo)}</p>` : ''}<div class="inline-actions"><button class="like-button ${post.liked ? 'liked' : ''}" data-like="${esc(post.id)}">${post.liked ? '♥' : '♡'} いいね　${post.likes}</button>${post.authorId === state.user.id ? `<button class="text-button" data-delete-post="${esc(post.id)}">投稿を削除</button>` : ''}</div></article>`).join('') : '<div class="panel empty-state">投稿がありません。最初の投稿をしてみましょう。</div>';
+    $('#postList').innerHTML = posts.length ? posts.map((post) => `<article class="post-card"><div class="post-meta"><div class="post-author"><span class="post-avatar">${avatarContent(post.authorPhotoUrl, post.author)}</span><span class="post-author-info"><strong>${esc(post.author)}</strong><small>${esc(post.model)}</small></span></div><time>${esc(post.createdAt.slice(0, 10))}</time></div><p class="post-body">${esc(post.text)}</p>${post.photoUrl ? `<img class="post-image" src="${esc(post.photoUrl)}" alt="${esc(post.model)}の投稿写真" loading="lazy">` : ''}${post.photo ? `<p class="row-sub">写真メモ：${esc(post.photo)}</p>` : ''}<div class="inline-actions"><button class="like-button ${post.liked ? 'liked' : ''}" data-like="${esc(post.id)}">${post.liked ? '♥' : '♡'} いいね　${post.likes}</button>${post.authorId === state.user.id ? `<button class="text-button" data-delete-post="${esc(post.id)}">投稿を削除</button>` : ''}</div></article>`).join('') : '<div class="panel empty-state">投稿がありません。最初の投稿をしてみましょう。</div>';
   }
 
   function openCost(record = null) {
@@ -301,6 +337,37 @@
   $$('[data-open-cost]').forEach((button) => button.addEventListener('click', () => openCost()));
   $$('[data-open-post]').forEach((button) => button.addEventListener('click', () => { $('#postForm').reset(); $('#postDialog').showModal(); }));
   $('#addCar').addEventListener('click', () => $('#carDialog').showModal());
+  $('#dashboardAddCar').addEventListener('click', () => $('#carDialog').showModal());
+  $('#changeVehiclePhoto').addEventListener('click', () => $('#vehiclePhotoInput').click());
+  $('#vehiclePhotoInput').addEventListener('change', async (event) => {
+    const input = event.currentTarget;
+    const file = input.files[0];
+    const vehicleId = input.dataset.vehicleId;
+    if (!file || !vehicleId) return;
+    const body = new FormData();
+    body.set('photoFile', file);
+    try {
+      const result = await api(`/api/vehicles/${vehicleId}/photo/`, { method: 'POST', body, formData: true });
+      const vehicle = state.vehicles.find((item) => item.id === vehicleId);
+      if (vehicle) vehicle.photoUrl = result.photoUrl;
+      render();
+      toast('車の画像を変更しました。');
+    } catch (error) { toast(error.message); }
+    finally { input.value = ''; }
+  });
+  $('#resetVehiclePhoto').addEventListener('click', async () => {
+    const vehicleId = $('#vehiclePhotoInput').dataset.vehicleId;
+    if (!vehicleId) return;
+    const body = new FormData();
+    body.set('reset', 'true');
+    try {
+      await api(`/api/vehicles/${vehicleId}/photo/`, { method: 'POST', body, formData: true });
+      const vehicle = state.vehicles.find((item) => item.id === vehicleId);
+      if (vehicle) vehicle.photoUrl = '';
+      render();
+      toast('デフォルトのイラストに戻しました。');
+    } catch (error) { toast(error.message); }
+  });
   $$('[data-close]').forEach((button) => button.addEventListener('click', () => button.closest('dialog').close()));
 
   $('#profileForm').addEventListener('submit', async (event) => {
@@ -308,6 +375,29 @@
     const data = Object.fromEntries(new FormData(event.currentTarget));
     try { await api('/api/profile/', { method: 'POST', body: data }); await refresh(); toast('プロフィールを保存しました。'); }
     catch (error) { toast(error.message); }
+  });
+  $('#changeProfilePhoto').addEventListener('click', () => $('#profilePhotoInput').click());
+  $('#profilePhotoInput').addEventListener('change', async (event) => {
+    const input = event.currentTarget;
+    const file = input.files[0];
+    if (!file) return;
+    const body = new FormData();
+    body.set('photoFile', file);
+    try {
+      await api('/api/profile/photo/', { method: 'POST', body, formData: true });
+      await refresh();
+      toast('プロフィール写真を変更しました。');
+    } catch (error) { toast(error.message); }
+    finally { input.value = ''; }
+  });
+  $('#resetProfilePhoto').addEventListener('click', async () => {
+    const body = new FormData();
+    body.set('reset', 'true');
+    try {
+      await api('/api/profile/photo/', { method: 'POST', body, formData: true });
+      await refresh();
+      toast('プロフィール写真を削除しました。');
+    } catch (error) { toast(error.message); }
   });
   $('#costForm').addEventListener('submit', async (event) => {
     event.preventDefault();
